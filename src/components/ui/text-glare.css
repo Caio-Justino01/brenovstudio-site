@@ -1,0 +1,17 @@
+.glare-word {
+  display: inline-block; max-width: 100%; color: var(--color-ice);
+  filter: var(--text-glare-shadow); transition: filter 180ms ease;
+}
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .glare-word {
+    background-image: var(--text-glare-fill); background-size: 220% 100%; background-position: 0% 50%;
+    background-clip: text; -webkit-background-clip: text; color: transparent;
+  }
+  .glare-text[data-playing] > .glare-word { animation: text-glare 1.6s cubic-bezier(.2,.6,.3,1) both; }
+}
+.glare-word:hover, :is(h1, h2, h3, .index-preview):focus-within .glare-word { filter: var(--text-glare-shadow-active); }
+@keyframes text-glare { from { background-position: 100% 50%; } to { background-position: 0% 50%; } }
+@media (prefers-reduced-motion: reduce) {
+  .glare-text[data-playing] > .glare-word { animation: none; }
+  .glare-word { transition: none; }
+}
