@@ -32,15 +32,20 @@ export function startSceneLoader<T extends Scene>(options: {
     const now = clock.now();
     return Math.max(0, now - startedAt - hiddenTime - (hiddenAt === undefined ? 0 : now - hiddenAt));
   };
-  const clearTimers = () => {
+  const clearOpeningTimer = () => {
     if (openingTimer !== undefined) clock.cancel(openingTimer);
+    openingTimer = undefined;
+  };
+  const clearInitializationTimer = () => {
     if (sceneTimer !== undefined) clock.cancel(sceneTimer);
-    openingTimer = sceneTimer = undefined;
+    sceneTimer = undefined;
     stopVisibility();
   };
+  const clearTimers = () => { clearOpeningTimer(); clearInitializationTimer(); };
   const releaseOpening = () => {
-    if (cancelled || failed || scene || openingReleased) return;
+    if (cancelled || failed || formationNotified || openingReleased) return;
     openingReleased = true;
+    clearOpeningTimer();
     options.onOpeningTimeout();
   };
   const fail = (reason: unknown = new Error('O contexto WebGL foi perdido.')) => {
@@ -55,6 +60,7 @@ export function startSceneLoader<T extends Scene>(options: {
   const complete = () => {
     if (cancelled || failed || formationNotified) return;
     formationNotified = true;
+    clearOpeningTimer();
     options.onFormationComplete();
   };
   const armSceneTimer = () => {
@@ -82,10 +88,11 @@ export function startSceneLoader<T extends Scene>(options: {
     }
     if (cancelled || failed) { created.dispose(); return; }
     if (clock.now() - startedAt >= OPENING_WAIT_TIMEOUT) releaseOpening();
-    clearTimers();
+    clearInitializationTimer();
     scene = created;
     options.onReady(created);
-    if (openingReleased || options.shouldRestore()) created.restore();
+    // Releasing the controls is independent of the visitor's request to see formation.
+    if (options.shouldRestore()) created.restore();
   }).catch(fail);
 
   return () => {

@@ -1,7 +1,7 @@
 .artist-story { position: relative; padding: 24px var(--page-gutter) clamp(3rem, 5vw, 5rem); scroll-margin-top: -24px; overflow: clip; }
 .artist-track { position: relative; overflow-anchor: none; }
 .artist-stage { position: relative; display: flow-root; }
-.artist-story[data-layout="pinned"] .artist-facts { opacity: 0; visibility: hidden; }
+.artist-story:is([data-layout="pinned"], [data-layout="pending"]) .artist-facts { opacity: 0; visibility: hidden; }
 .artist-story[data-layout="pinned"] .artist-track::after { content: ''; display: block; height: var(--story-travel); pointer-events: none; }
 .artist-story[data-layout="pinned"] .artist-stage { position: sticky; top: var(--story-top); }
 .artist-caption { margin-bottom: 1rem; }
@@ -61,6 +61,9 @@
   .artist-copy { padding-bottom: .5rem; }
   .artist-description { margin-top: .75rem; }
   .artist-contact { margin-top: 1rem; }
+}
+@media (max-width: 767px) {
+  .artist-story { padding-top: 2.5rem; padding-bottom: 5rem; }
 }
 .artist-story[data-layout="flow"] .artist-invitation { opacity: 0; }
 .artist-story[data-layout="flow"] .artist-introduction { opacity: 1; }

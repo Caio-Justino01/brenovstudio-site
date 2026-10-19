@@ -93,6 +93,22 @@ test('a composição completa mede o painel e libera o fluxo quando as descriç�
   assert.deepEqual(storyFrame(1, settings), { closed: 0, invitation: 0, identity: 1, phase: 'identity' });
 });
 
+test('no celular o núcleo de leitura fixa os olhos mesmo com o restante do painel abaixo do visor', () => {
+  const mobile = { ...metrics, width: 390, height: 664, stageHeight: 644, pinHeight: 500 };
+  const layout = storyLayout(mobile, settings);
+  assert.equal(layout.pinned, true);
+  assert.ok(Math.abs(layout.distance - 630.2) < 1e-10);
+  assert.equal(storyFrame(0, settings).closed, 1);
+  assert.equal(storyFrame(120 / layout.distance, settings).identity, 0);
+  assert.equal(storyLayout({ ...mobile, pinHeight: 644 }, settings).pinned, false);
+  for (const changes of [{ stageHeight: 0 }, { pinHeight: 0 }, { reduced: true }, { failed: true }]) {
+    assert.equal(storyLayout({ ...mobile, ...changes }, settings).pinned, false);
+  }
+  const stable = stableStoryMetrics({ ...mobile, pinHeight: 500.5 }, mobile);
+  assert.equal(sameStoryMetrics(mobile, stable), true);
+  assert.equal(sameStoryMetrics(mobile, { ...mobile, pinHeight: 501 }), false);
+});
+
 test('resize conserva progresso de leitura e quadro visual, sem forçar posições de fora do palco', () => {
   for (const progress of [0, .2, .45, .65, 1]) {
     const saved = captureStoryProgress(1400, 2027.2, 1400 + 627.2 * progress, Math.max(0, progress - .04))!;

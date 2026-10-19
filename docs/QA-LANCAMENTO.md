@@ -1,5 +1,19 @@
 # Revisão de entrega, 19/10/2026
 
+## Revisão móvel posterior ao primeiro envio
+
+Relato em iPhone 12 e 15 Pro, Safari e Chrome. Ajustados toque da logo, replay da entrada, fixação das pastas e olhos em altura útil reduzida e respiro entre seções. Conferência no build compilado, sem depender de HMR. Não houve aparelho físico ou Safari neste ambiente.
+
+- 125 testes aprovados, TypeScript, build e check:release; 139 imports locais verificados. Dependências e lockfile preservados. Log output/qa-mobile-animation-final.log.
+- Navegador em 390 × 664 e 393 × 658: índice e História permanecem fixos; controles da prévia com pelo menos 48 px. Expansão/recolhimento do painel conserva foco e leitura.
+- 320 × 800, 390 × 844, 768 × 1024, 1024 × 768 e 1440 × 900 sem transbordamento ou imagens quebradas. Paisagem 844 × 390 conserva fluxo natural.
+- Em aproximadamente 107 px, a primeira pasta e o convite dos olhos permanecem. Avanço maior abre olhos/informações; retorno fecha, sem deslocar o palco de 92 px. As fotos da janela compacta usam svh, sem gatilho por altura variável da barra.
+- Recarga em #inicio após End, com posição antiga de 6229,3 px: dois testes compilados voltaram a zero e completaram a formação. Bootstrap antes do React sincroniza a restauração do navegador e do GSAP. Sem resets em loop. Back/Forward não realinha as âncoras iniciais dos filhos.
+- Selecionar Captação na prévia reflete no formulário; Continuar orçamento foca Seu nome. Dissolução conclui no índice com foco e margem corretos. A saída iniciada com formação tardia mantém Promise e overlay até o fim.
+- Revisão independente encontrou os conflitos de restauração e handoff antes do fechamento; ambos corrigidos e novamente revisados. Console consultado da origem compilada sem erros/avisos.
+
+Evidências na pasta de visualizações: mobile-build-hero-inicio.png, mobile-build-historia-olhos.png, mobile-pastas-orcamento.png e mobile-animation-matriz.json. Toque e cancelamento possuem testes de política, sem simulação física de Safari. Gesto vertical pode passar a rolagem nativa via pointercancel, encerrando o líquido; traço local/horizontal permanece interativo. Validar em aparelho real continua necessário para confirmar performance e gestos iOS. Movimento reduzido e falha gráfica continuam com alternativa estática.
+
 ## Versão de apresentação
 
 Plano de envio aprovado pelo usuário: preparar, corrigir, testar, criar commit e atualizar https://github.com/Caio-Justino01/brenovstudio-site.git. A consulta remota confirmou repositório público não arquivado, sem refs, com branch padrão main. O envio deve ser confirmado pelo SHA remoto e pelo GitHub Actions. A conexão e o deployment Vercel ficam com o usuário; nenhum deployment é presumido de um push ou build.

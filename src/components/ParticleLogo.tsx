@@ -1,7 +1,7 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import type { ParticleController } from '../lib/particleScene';
 import { startSceneLoader } from '../lib/sceneLoader';
-import { OPENING_WAIT_TIMEOUT } from '../lib/opening';
+import { restoreBypassedOpening } from '../lib/opening';
 
 type Props = {
   host: RefObject<HTMLDivElement | null>;
@@ -9,16 +9,18 @@ type Props = {
   controller: RefObject<ParticleController | null>;
   reducedMotion: boolean;
   opening: boolean;
+  exiting: RefObject<boolean>;
   onStatus: (status: 'ready' | 'static') => void;
+  onOpeningTimeout: () => void;
   onFormationComplete: () => void;
 };
 
-export function ParticleLogo({ host, image, controller, reducedMotion, opening, onStatus, onFormationComplete }: Props) {
+export function ParticleLogo({ host, image, controller, reducedMotion, opening, exiting, onStatus, onOpeningTimeout, onFormationComplete }: Props) {
   const openingRef = useRef(opening);
   openingRef.current = opening;
   useEffect(() => {
-    if (!opening) controller.current?.restore();
-  }, [opening, controller]);
+    restoreBypassedOpening(controller.current, opening, exiting.current);
+  }, [opening, controller, exiting]);
 
   useEffect(() => {
     if (reducedMotion || !host.current || !image.current) {
@@ -29,24 +31,23 @@ export function ParticleLogo({ host, image, controller, reducedMotion, opening, 
       delete host.current.dataset.sceneFailure;
       delete host.current.dataset.sceneLoading;
     }
-    const started = performance.now();
     const stop = startSceneLoader({
       load: async ({ signal, onFailure, onFormationComplete: complete }) => {
         const { createParticleScene } = await import('../lib/particleScene');
         if (signal.aborted) throw signal.reason;
         return createParticleScene({ host: host.current!, image: image.current!, onFailure, signal,
           onFormationComplete: complete,
-          opening: () => openingRef.current && performance.now() - started < OPENING_WAIT_TIMEOUT });
+          opening: () => openingRef.current });
       },
-      shouldRestore: () => !openingRef.current,
+      shouldRestore: () => !openingRef.current && !exiting.current,
       onReady: (created) => {
         controller.current = created;
         if (import.meta.env.DEV && host.current) host.current.dataset.sceneLoading = 'ready';
         onStatus('ready');
       },
       onOpeningTimeout: () => {
-        if (import.meta.env.DEV && host.current) host.current.dataset.sceneLoading = 'background';
-        onStatus('static');
+        if (import.meta.env.DEV && host.current) host.current.dataset.sceneLoading = controller.current ? 'ready' : 'background';
+        onOpeningTimeout();
       },
       onFallback: (reason) => {
         controller.current = null;
@@ -62,6 +63,6 @@ export function ParticleLogo({ host, image, controller, reducedMotion, opening, 
       stop();
       controller.current = null;
     };
-  }, [host, image, controller, reducedMotion, onStatus, onFormationComplete]);
+  }, [host, image, controller, exiting, reducedMotion, onStatus, onOpeningTimeout, onFormationComplete]);
   return null;
 }

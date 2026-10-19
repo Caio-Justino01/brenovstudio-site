@@ -20,6 +20,7 @@ function fixture(initiallyHidden?: boolean) {
   const scene = { restores: 0, disposals: 0, restore() { this.restores++; }, dispose() { this.disposals++; } };
   const pending = new Promise<typeof scene>((yes, no) => { resolve = yes; reject = no; });
   let hidden = initiallyHidden ?? false;
+  let bypassed = false;
   const listeners = new Set<() => void>();
   const visibility = initiallyHidden === undefined ? undefined : {
     isHidden: () => hidden,
@@ -27,7 +28,7 @@ function fixture(initiallyHidden?: boolean) {
   };
   const stop = startSceneLoader({
     load: (input) => { hooks = input; return pending; },
-    shouldRestore: () => false,
+    shouldRestore: () => bypassed,
     onReady: () => events.push('ready'),
     onOpeningTimeout: () => events.push('release'),
     onFallback: (reason) => { failure = reason; events.push('fallback'); },
@@ -45,7 +46,8 @@ function fixture(initiallyHidden?: boolean) {
   };
   return { events, scene, stop, advance, resolve: () => resolve(scene), reject,
     jump: (to: number) => { time = to; }, hooks: () => hooks, failure: () => failure,
-    visibility: (value: boolean) => { hidden = value; listeners.forEach(callback => callback()); }, listeners };
+    visibility: (value: boolean) => { hidden = value; listeners.forEach(callback => callback()); }, listeners,
+    bypass: () => { bypassed = true; } };
 }
 
 test('cena rápida preserva a abertura e notifica somente a formação real uma vez', async () => {
@@ -53,25 +55,56 @@ test('cena rápida preserva a abertura e notifica somente a formação real uma 
   await flush();
   f.resolve(); await flush();
   assert.deepEqual(f.events, ['ready']);
-  f.advance(4000);
+  f.advance(2000);
   assert.deepEqual(f.events, ['ready']);
   f.hooks().onFormationComplete(); f.hooks().onFormationComplete();
+  f.advance(4000);
   assert.deepEqual(f.events, ['ready', 'formed']);
   assert.equal(f.scene.restores, 0);
   f.stop();
   assert.equal(f.scene.disposals, 1);
 });
 
-test('três segundos liberam a interface sem abortar a cena que chega depois', async () => {
+test('três segundos liberam a interface sem abortar nem pular a formação da cena tardia', async () => {
   const f = fixture(); await flush();
   f.advance(3000);
   assert.deepEqual(f.events, ['release']);
   assert.equal(f.hooks().signal.aborted, false);
   f.advance(4500); f.resolve(); await flush();
   assert.deepEqual(f.events, ['release', 'ready']);
-  assert.equal(f.scene.restores, 1);
+  assert.equal(f.scene.restores, 0);
   assert.equal(f.scene.disposals, 0);
   f.advance(11000);
+  assert.deepEqual(f.events, ['release', 'ready']);
+  f.stop();
+});
+
+test('formação tardia conclui uma única vez após a interface já estar disponível', async () => {
+  const f = fixture(); await flush();
+  f.advance(3000); f.advance(6500); f.resolve(); await flush();
+  assert.deepEqual(f.events, ['release', 'ready']);
+  assert.equal(f.scene.restores, 0);
+  f.hooks().onFormationComplete(); f.hooks().onFormationComplete();
+  assert.deepEqual(f.events, ['release', 'ready', 'formed']);
+  f.stop();
+});
+
+test('cena pronta antes dos três segundos não mantém a interface oculta enquanto ainda forma', async () => {
+  const f = fixture(); await flush();
+  f.advance(2500); f.resolve(); await flush();
+  assert.deepEqual(f.events, ['ready']);
+  f.advance(3000);
+  assert.deepEqual(f.events, ['ready', 'release']);
+  assert.equal(f.scene.restores, 0);
+  f.hooks().onFormationComplete();
+  assert.deepEqual(f.events, ['ready', 'release', 'formed']);
+  f.stop();
+});
+
+test('navegação explícita cancela a intenção de formação mesmo se a cena ainda estava carregando', async () => {
+  const f = fixture(); await flush();
+  f.advance(3200); f.bypass(); f.resolve(); await flush();
+  assert.equal(f.scene.restores, 1);
   assert.deepEqual(f.events, ['release', 'ready']);
   f.stop();
 });
@@ -80,7 +113,7 @@ test('tempo absoluto também libera a abertura após uma inicialização bloquea
   const f = fixture(); await flush();
   f.jump(4500); f.resolve(); await flush();
   assert.deepEqual(f.events, ['release', 'ready']);
-  assert.equal(f.scene.restores, 1);
+  assert.equal(f.scene.restores, 0);
   f.stop();
 });
 
@@ -132,11 +165,11 @@ test('aba oculta não consome o prazo GPU e a interface continua liberada aos tr
   f.stop();
 });
 
-test('cena carregada durante suspensão pode assumir a marca formada sem falso timeout', async () => {
+test('cena carregada durante suspensão preserva a formação pendente sem falso timeout', async () => {
   const f = fixture(true); await flush();
   f.advance(60000); f.resolve(); await flush();
   assert.deepEqual(f.events, ['release', 'ready']);
-  assert.equal(f.scene.restores, 1);
+  assert.equal(f.scene.restores, 0);
   assert.equal(f.hooks().signal.aborted, false);
   assert.equal(f.listeners.size, 0);
   f.stop();

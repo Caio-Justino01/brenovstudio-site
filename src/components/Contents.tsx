@@ -8,9 +8,10 @@ import { LiquidButton } from './ui/liquid-glass';
 import { ProductionWindow } from './ProductionWindow';
 import { GlareText } from './ui/GlareText';
 import { syncScrollProgress } from '../lib/scrollSync';
+import { sceneViewportHeight } from '../lib/sceneViewport';
 
-type Props = { entry: IndexEntry; onEntryComplete: () => void; selectedServices: readonly ServiceId[]; onToggleService: (id: ServiceId) => void };
-export function Contents({ entry, onEntryComplete, selectedServices, onToggleService }: Props) {
+type Props = { entry: IndexEntry; onEntryComplete: () => void; selectedServices: readonly ServiceId[]; onToggleService: (id: ServiceId) => void; alignInitialSection: boolean };
+export function Contents({ entry, onEntryComplete, selectedServices, onToggleService, alignInitialSection }: Props) {
   const root = useRef<HTMLElement>(null), stage = useRef<HTMLDivElement>(null);
   const scroll = useRef<ScrollTrigger | null>(null);
   const activeRef = useRef(0);
@@ -67,7 +68,7 @@ export function Contents({ entry, onEntryComplete, selectedServices, onToggleSer
         contentHeight = top.offsetHeight + gap + content + 8;
       }
       const previous = measured.current;
-      const next = stableIndexMetrics({ width: innerWidth, height: innerHeight, header: header?.getBoundingClientRect().bottom ?? 76, reduced: mq.matches, contentHeight }, previous);
+      const next = stableIndexMetrics({ width: innerWidth, height: sceneViewportHeight(root.current, innerHeight), header: header?.getBoundingClientRect().bottom ?? 76, reduced: mq.matches, contentHeight }, previous);
       if (sameIndexMetrics(previous, next)) return;
       const nextLayout = indexLayout(next.width, next.height, next.header, next.reduced, next.contentHeight);
       const oldLayout = indexLayout(previous.width, previous.height, previous.header, previous.reduced, previous.contentHeight);
@@ -78,7 +79,7 @@ export function Contents({ entry, onEntryComplete, selectedServices, onToggleSer
     };
     const scheduleMeasure = () => { if (!measureFrame) measureFrame = requestAnimationFrame(measure); };
     const observer = new ResizeObserver(scheduleMeasure);
-    [header, top, card, copy].forEach(element => { if (element) observer.observe(element); });
+    [header, top, card, copy, root.current?.querySelector('.scene-viewport-measure')].forEach(element => { if (element) observer.observe(element); });
     const interacted = () => { initialAligned.current = true; revision.current++; transfer.current = null; navigationUntil.current = 0; };
     const navigation = () => { interacted(); navigationUntil.current = performance.now() + 1500; };
     const anchor = (event: MouseEvent) => {
@@ -97,7 +98,7 @@ export function Contents({ entry, onEntryComplete, selectedServices, onToggleSer
           if (!alive) return;
           const saved = capture();
           rebuilding.current = true; ScrollTrigger.sort(); ScrollTrigger.refresh(); restore(saved); rebuilding.current = false;
-          if (!initialAligned.current) { initialAligned.current = true; if (location.hash === '#indice') alignIndex(); }
+          if (!initialAligned.current) { initialAligned.current = true; if (alignInitialSection && location.hash === '#indice') alignIndex(); }
         });
       });
     });
@@ -108,7 +109,7 @@ export function Contents({ entry, onEntryComplete, selectedServices, onToggleSer
       removeEventListener('hashchange', navigation); removeEventListener('popstate', navigation);
       document.removeEventListener('click', anchor, true);
     };
-  }, [capture, restore]);
+  }, [capture, restore, alignInitialSection]);
 
   useGSAP((context) => {
     if (!root.current || !stage.current) return;
@@ -186,6 +187,7 @@ export function Contents({ entry, onEntryComplete, selectedServices, onToggleSer
         });
       }}
       data-layout={layout.pinned ? 'pinned' : 'flow'} data-entry={entry} data-active={active} data-title-ready={titlesReady || undefined}>
+      <span className="scene-viewport-measure" aria-hidden="true" />
       <div className="index-stage" ref={stage}>
         <div className="index-entry">
           <div className="index-top">

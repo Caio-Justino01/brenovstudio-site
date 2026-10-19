@@ -7,22 +7,26 @@ import type { ParticleController } from '../lib/particleScene';
 import type { OpeningMode } from '../lib/opening';
 import type { IndexEntry } from '../lib/indexMotion';
 import { runIndexExit } from '../lib/exitTransition';
+import { createLogoTouch } from '../lib/logoTouch';
 
 type Props = {
   openingMode: OpeningMode;
+  openingPending: boolean;
+  onOpeningTimeout: () => void;
   onFormationComplete: () => void;
   onBypass: () => void;
   onEnterIndex: (focus?: boolean) => void;
   onIndexTransition: (entry: IndexEntry) => void;
 };
 
-export function Intro({ openingMode, onFormationComplete, onBypass, onEnterIndex, onIndexTransition }: Props) {
+export function Intro({ openingMode, openingPending, onOpeningTimeout, onFormationComplete, onBypass, onEnterIndex, onIndexTransition }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const image = useRef<HTMLImageElement>(null);
   const controller = useRef<ParticleController | null>(null);
   const entering = useRef(false);
   const mounted = useRef(true);
   const pointerProbe = useRef({ events: 0, hover: 0, pressed: 0 });
+  const logoTouch = useRef(createLogoTouch());
   const [reducedMotion, setReducedMotion] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [status, setStatus] = useState<'loading' | 'ready' | 'static'>(() => reducedMotion ? 'static' : 'loading');
   const [leaving, setLeaving] = useState(false);
@@ -56,6 +60,7 @@ export function Intro({ openingMode, onFormationComplete, onBypass, onEnterIndex
     const returnToIntro = () => {
       if (window.location.hash && window.location.hash !== '#inicio') return;
       entering.current = false;
+      logoTouch.current.reset();
       setLeaving(false);
       onBypass();
       controller.current?.restore();
@@ -64,6 +69,7 @@ export function Intro({ openingMode, onFormationComplete, onBypass, onEnterIndex
     window.addEventListener('hashchange', returnToIntro);
     return () => {
       mounted.current = false;
+      logoTouch.current.reset();
       media.removeEventListener('change', change);
       window.removeEventListener('hashchange', returnToIntro);
     };
@@ -73,6 +79,9 @@ export function Intro({ openingMode, onFormationComplete, onBypass, onEnterIndex
   const enter = async (event: MouseEvent<HTMLAnchorElement | HTMLButtonElement>) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault();
+    const native = event.nativeEvent as globalThis.MouseEvent & { pointerType?: string };
+    if (event.currentTarget.hasAttribute('data-logo-trigger') &&
+      logoTouch.current.suppressClick(event.detail, performance.now(), native.pointerType)) return;
     if (entering.current) return;
     entering.current = true;
     if (controller.current && !reducedMotion) {
@@ -90,8 +99,23 @@ export function Intro({ openingMode, onFormationComplete, onBypass, onEnterIndex
 
   return (
     <section id="inicio" className="intro" aria-label="Apresentação" data-scene={status} data-leaving={leaving || undefined}
-      onPointerUp={(event) => { if (event.pointerType !== 'mouse') controller.current?.pointer(event.clientX, event.clientY, false); }}
-      onPointerCancel={(event) => controller.current?.pointer(event.clientX, event.clientY, false)}
+      onPointerDown={(event) => {
+        if (!event.isPrimary || entering.current) return;
+        if (event.pointerType === 'mouse') { logoTouch.current.reset(); return; }
+        if (!(event.target instanceof Element) || !event.target.closest('[data-logo-trigger]')) return;
+        logoTouch.current.start(event.pointerId, event.clientX, event.clientY, performance.now());
+        controller.current?.pointer(event.clientX, event.clientY, true);
+      }}
+      onPointerUp={(event) => {
+        if (event.pointerType === 'mouse' || !event.isPrimary) return;
+        logoTouch.current.finish(event.pointerId, event.clientX, event.clientY, performance.now());
+        controller.current?.pointer(event.clientX, event.clientY, false);
+      }}
+      onPointerCancel={(event) => {
+        if (!event.isPrimary) return;
+        logoTouch.current.finish(event.pointerId, event.clientX, event.clientY, performance.now(), true);
+        controller.current?.pointer(event.clientX, event.clientY, false);
+      }}
       onPointerMove={(event) => {
         if (import.meta.env.DEV && host.current) {
           const probe = pointerProbe.current;
@@ -102,12 +126,18 @@ export function Intro({ openingMode, onFormationComplete, onBypass, onEnterIndex
             control: isControl(event.target), controller: Boolean(controller.current), entering: entering.current });
         }
         if (!event.isPrimary || entering.current) return;
-        controller.current?.pointer(event.clientX, event.clientY, event.pointerType === 'mouse' && !isControl(event.target));
+        const active = !isControl(event.target) && (event.pointerType === 'mouse' ||
+          logoTouch.current.move(event.pointerId, event.clientX, event.clientY));
+        controller.current?.pointer(event.clientX, event.clientY, active);
       }}
-      onPointerLeave={(event) => controller.current?.pointer(event.clientX, event.clientY, false)}>
+      onPointerLeave={(event) => {
+        if (!event.isPrimary) return;
+        if (event.pointerType !== 'mouse') logoTouch.current.finish(event.pointerId, event.clientX, event.clientY, performance.now(), true);
+        controller.current?.pointer(event.clientX, event.clientY, false);
+      }}>
       <div className="intro__particles" ref={host} aria-hidden="true" />
-      <ParticleLogo host={host} image={image} controller={controller} reducedMotion={reducedMotion} opening={openingMode === 'hidden'}
-        onStatus={onStatus} onFormationComplete={onFormationComplete} />
+      <ParticleLogo host={host} image={image} controller={controller} reducedMotion={reducedMotion} opening={openingPending} exiting={entering}
+        onStatus={onStatus} onOpeningTimeout={onOpeningTimeout} onFormationComplete={onFormationComplete} />
       <img
         ref={image}
         className="intro__logo"

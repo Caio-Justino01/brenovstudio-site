@@ -62,6 +62,19 @@
   .production-window__bar .studio-mark { width: 26px; height: 26px; }
   .production-window__choices .liquid-control { font-size: .75rem; padding-inline: 9px; }
 }
+@media (max-width: 767px) {
+  .site-contents .index-entry { gap: 12px; }
+  .site-contents[data-layout] .index-preview.index-preview--production { gap: 12px; }
+  .index-preview--production .index-title { font-size: 2.25rem; }
+  .index-preview--production .index-detail { font-size: .75rem; line-height: 1.5; margin-top: 6px; }
+  .production-window { padding: 6px; }
+  .production-window__bar { padding: 2px 2px 4px; }
+  .production-window__bar .studio-mark { width: 24px; height: 24px; }
+  .production-window__works { height: 64px; height: clamp(64px, calc(100svh - 600px), 154px); }
+  .production-window__brief { padding: 8px 4px 4px; }
+  .production-window legend { font-size: .875rem; margin-bottom: 6px; }
+  .production-window__description { margin: 6px 0; }
+}
 @media (prefers-reduced-motion: reduce) {
   .production-window[data-present="true"] .production-reveal { animation: none; }
 }

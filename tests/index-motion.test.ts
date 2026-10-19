@@ -53,3 +53,14 @@ test('120 px não atravessam duas opções, em nenhum ponto ou sentido do percur
     }
   }
 });
+
+test('a composição compacta mantém as pastas fixas com a barra do navegador móvel aberta', () => {
+  for (const [width, height] of [[390, 664], [393, 659], [375, 667]]) {
+    const layout = indexLayout(width, height, 68, false, 536);
+    assert.equal(layout.pinned, true);
+    assert.equal(previewAt(120 / layout.distance), 0);
+    assert.equal(indexLayout(width, height, 68, false, layout.available + 1).pinned, false);
+    assert.equal(indexLayout(width, height, 68, true, 536).pinned, false);
+  }
+  assert.equal(indexLayout(844, 390, 68, false, 536).pinned, false);
+});

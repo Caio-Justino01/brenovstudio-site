@@ -3,7 +3,7 @@ export const previewStops = [0, .5, 1] as const;
 export function previewAt(progress: number) { return progress < .31 ? 0 : progress < .79 ? 1 : 2; }
 export function indexLayout(width: number, height: number, header: number, reduced: boolean, contentHeight = 560) {
   const available = Math.max(0, height - header - 48);
-  return { pinned: !reduced && available >= Math.max(560, contentHeight), available, distance: height * (width < 768 ? 2 : 2.4) };
+  return { pinned: !reduced && available >= Math.max(width < 768 ? 440 : 560, contentHeight), available, distance: height * (width < 768 ? 2 : 2.4) };
 }
 
 export type IndexMetrics = { width: number; height: number; header: number; reduced: boolean; contentHeight: number };

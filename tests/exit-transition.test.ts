@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createExitClock, createExitTransition, runIndexExit } from '../src/lib/exitTransition.ts';
 import { createLiquidClock, LIQUID_SPEED, LIQUID_STEP } from '../src/lib/liquidHover.ts';
 import { EXIT_DURATION, EXIT_HANDOFF } from '../src/lib/exitDissolve.ts';
+import { restoreBypassedOpening } from '../src/lib/opening.ts';
 
 test('acionamentos duplicados compartilham Promise e a passagem ocorre uma vez', async () => {
   const exit = createExitTransition(); let covers = 0;
@@ -94,4 +95,40 @@ test('cadência baixa preserva callback único, Promise e conclusão após tempo
   assert.equal(covered, 1);
   assert.equal(finished, true);
   assert.equal(exit.active, false);
+});
+
+test('CTA durante formação tardia mantém a dissolução ativa após consumir a abertura no handoff', async () => {
+  const exit = createExitTransition();
+  const clock = createExitClock(EXIT_DURATION, EXIT_HANDOFF);
+  let openingPending = true, exiting = true, restored = 0, settled = false;
+  const scene = { restore() { restored++; exit.finish(); } };
+  const steps: string[] = [];
+  const run = runIndexExit((covered) => { clock.start(); return exit.start(covered); }, () => exiting,
+    () => {
+      steps.push('index'); openingPending = false;
+      restoreBypassedOpening(scene, openingPending, exiting);
+    }, () => steps.push('reveal'));
+  void run.then(() => { settled = true; });
+  for (let i = 0; i < 39; i++) {
+    const state = clock.advance(.05);
+    if (state.covered) exit.cover();
+  }
+  await Promise.resolve();
+  assert.equal(openingPending, false);
+  assert.equal(restored, 0, 'troca do fundo não restaura a cena durante a saída');
+  assert.equal(exit.active, true);
+  assert.equal(settled, false, 'handoff não corta a dissipação final');
+  assert.deepEqual(steps, ['index']);
+  for (let i = 0; i < 12; i++) {
+    const state = clock.advance(.05);
+    if (state.covered) exit.cover();
+    if (state.complete) exit.finish();
+  }
+  await run;
+  assert.deepEqual(steps, ['index', 'reveal']);
+  assert.equal(restored, 0);
+  exiting = false;
+  // An explicit cancellation/return still restores normally once exit ownership is released.
+  restoreBypassedOpening(scene, openingPending, exiting);
+  assert.equal(restored, 1);
 });

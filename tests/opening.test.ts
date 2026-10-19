@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { shouldPlayOpening } from '../src/lib/opening.ts';
 import { alignContentSection, alignIndex, navigateToIndex } from '../src/lib/navigation.ts';
 
-test('abertura ocorre somente na hero no topo e sem movimento reduzido', () => {
-  assert.equal(shouldPlayOpening('', 0, false), true);
-  assert.equal(shouldPlayOpening('#inicio', 0, false), true);
+test('abertura segue o destino inicial e não a posição restaurada do navegador', () => {
+  assert.equal(shouldPlayOpening('', false), true);
+  assert.equal(shouldPlayOpening('#inicio', false, 'reload'), true);
   for (const hash of ['#indice', '#historia', '#portfolio', '#orcamento']) {
-    assert.equal(shouldPlayOpening(hash, 0, false), false);
+    assert.equal(shouldPlayOpening(hash, false), false);
   }
-  assert.equal(shouldPlayOpening('', 320, false), false);
-  assert.equal(shouldPlayOpening('', 0, true), false);
+  assert.equal(shouldPlayOpening('', false, 'back_forward'), false);
+  assert.equal(shouldPlayOpening('', true), false);
 });
 
 test('âncoras de conteúdo alinham o título e preservam histórico e foco quando não solicitados', () => {

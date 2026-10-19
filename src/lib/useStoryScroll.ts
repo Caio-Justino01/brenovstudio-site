@@ -4,12 +4,13 @@ import { gsap, ScrollTrigger, useGSAP } from './motion';
 import { alignContentSection } from './navigation';
 import { canRestoreStory, captureStoryProgress, restoreStoryFlowPosition, restoreStoryPosition, sameStoryMetrics, stableStoryMetrics, storyEyeLight, storyFrame, storyLayout, type StoryMetrics, type StoryProgress } from './storyMotion';
 import { syncScrollProgress } from './scrollSync';
+import { sceneViewportHeight } from './sceneViewport';
 
 type ElementRef = RefObject<HTMLElement | null>;
 type Reading = ({ kind: 'progress'; progress: StoryProgress } | { kind: 'flow'; top: number } | { kind: 'marker'; element: HTMLElement; top: number }) & { revision: number };
 const settings = about.presentation.scroll;
 
-export function useStoryScroll(root: ElementRef, track: ElementRef, stage: ElementRef, failed: boolean) {
+export function useStoryScroll(root: ElementRef, track: ElementRef, stage: ElementRef, failed: boolean, alignInitialSection: boolean) {
   const trigger = useRef<ScrollTrigger | null>(null);
   const revision = useRef(0), navigationUntil = useRef(0), building = useRef(false), restoring = useRef(false);
   const transfer = useRef<Reading | null>(null), refreshFrame = useRef(0), initialAligned = useRef(false);
@@ -19,7 +20,7 @@ export function useStoryScroll(root: ElementRef, track: ElementRef, stage: Eleme
   const layout = storyLayout(metrics, settings);
 
   const capture = (nextPinned: boolean): Reading | null => {
-    if (performance.now() < navigationUntil.current || restoring.current) return null;
+    if (!measured.current.stageHeight || performance.now() < navigationUntil.current || restoring.current) return null;
     const current = trigger.current;
     const element = stage.current;
     if (!element) return null;
@@ -72,8 +73,13 @@ export function useStoryScroll(root: ElementRef, track: ElementRef, stage: Eleme
       frame = 0;
       if (!alive) return;
       const previous = measured.current;
-      const next = stableStoryMetrics({ width: innerWidth, height: innerHeight, header: header?.offsetHeight ?? 68,
-        stageHeight: element.offsetHeight, reduced: query.matches, failed }, previous);
+      const facts = element.querySelector<HTMLElement>('.artist-facts');
+      const overview = element.querySelector<HTMLElement>('.artist-facts__overview');
+      // On shorter phones the eyes, biography and panel controls stay in view; results continue naturally below.
+      const readingHeight = innerWidth < 768 && facts && overview && !facts.hasAttribute('data-expanded')
+        ? facts.offsetTop + overview.offsetHeight : element.offsetHeight;
+      const next = stableStoryMetrics({ width: innerWidth, height: sceneViewportHeight(root.current, innerHeight), header: header?.offsetHeight ?? 68,
+        stageHeight: element.offsetHeight, pinHeight: readingHeight, reduced: query.matches, failed }, previous);
       if (sameStoryMetrics(previous, next)) return;
       transfer.current = callbacks.current.capture(storyLayout(next, settings).pinned);
       measured.current = next;
@@ -82,6 +88,7 @@ export function useStoryScroll(root: ElementRef, track: ElementRef, stage: Eleme
     const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
     const observer = new ResizeObserver(schedule);
     observer.observe(element); if (header) observer.observe(header);
+    const viewportProbe = root.current?.querySelector('.scene-viewport-measure'); if (viewportProbe) observer.observe(viewportProbe);
     const interaction = () => {
       revision.current++; transfer.current = null; initialAligned.current = true;
       // A fresh gesture ends the anchor guard; subsequent content resize must preserve the reading position.
@@ -184,7 +191,7 @@ export function useStoryScroll(root: ElementRef, track: ElementRef, stage: Eleme
     document.addEventListener('visibilitychange', visibility);
     if (!initialAligned.current) {
       initialAligned.current = true;
-      if (location.hash === '#historia') alignContentSection('historia');
+      if (alignInitialSection && location.hash === '#historia') alignContentSection('historia');
     }
     return () => {
       trigger.current = null; cancelAnimationFrame(refreshFrame.current);
@@ -194,7 +201,7 @@ export function useStoryScroll(root: ElementRef, track: ElementRef, stage: Eleme
       for (const content of [information, facts]) { content.style.removeProperty('visibility'); content.inert = false; }
       eyeLight.style.removeProperty('--eye-light');
     };
-  }, { scope: root, dependencies: [layout.pinned, layout.distance, layout.top, metrics.width, metrics.stageHeight], revertOnUpdate: true });
+  }, { scope: root, dependencies: [layout.pinned, layout.distance, layout.top, metrics.width, metrics.stageHeight, metrics.pinHeight], revertOnUpdate: true });
 
   return { layout, metrics };
 }

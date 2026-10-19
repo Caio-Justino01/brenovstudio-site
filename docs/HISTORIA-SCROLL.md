@@ -37,11 +37,11 @@ O campo light do mesmo cadastro de scroll controla uma única passagem: nasce en
 ## Implementação e prevenção de saltos
 
 1. Retirar StoryPresentation, temporizadores de avanço e controles Pausar/Rever. Substituir o tween independente dos olhos pela timeline do scroll. Uma única origem controla olhos e títulos.
-2. Criar um palco interno com legenda, retrato, texto, contatos e Sobre o trabalho. Fixar esse conjunto no respiro de 24 px abaixo do cabeçalho quando couber inteiro.
+2. Criar um palco interno com legenda, retrato, texto, contatos e Sobre o trabalho. Fixar esse conjunto no respiro de 24 px abaixo do cabeçalho. No celular recolhido, a elegibilidade considera o núcleo de olhos, biografia, contatos e cabeçalho do painel; os resultados continuam anexados logo abaixo, com altura natural.
 3. Manter a altura natural do palco e acrescentar somente o percurso adicional num pseudo-elemento da trilha. Assim a expansão altera a geometria no mesmo quadro, sem aguardar uma altura antiga medida por JavaScript. ScrollTrigger controla somente o progresso visual, sem pin-spacer ou estilos de position/transform injetados no palco. Opacidades não alteram medidas.
 4. Concentrar distâncias, intervalos e suavização num cadastro tipado. Criar helper puro para geometria/progresso, com clamps e limites válidos. Não mudar o controlador da logo nem o índice.
 5. Agrupar medições em RAF e ignorar variações subpixel. Não reconstruir a timeline a cada scroll ou render React. Reaproveitar a estratégia de captura/restauração do índice: resize dentro do trecho conserva progresso e quadro visual; fora dele não força posição.
-6. Antes de reaplicar uma posição após resize, conferir se não houve navegação, gesto ou foco que a substitua. Uma ação nova da pessoa vence a restauração.
+6. Antes de reaplicar uma posição após resize, conferir se não houve navegação, gesto ou foco que a substitua. Uma ação nova da pessoa vence a restauração. A primeira medição não captura o estado pendente como identidade já lida. A altura usa uma sonda 100svh, evitando reconstrução por abertura e fechamento da barra do navegador. História e Índice respeitam a decisão inicial compartilhada de navegação: Back/Forward não realinha as âncoras ao início.
 7. Medir dimensões conhecidas das imagens e fontes. Mídia tardia assume o progresso atual, sem repetir abertura. Falhas conservam a fotografia disponível e texto legível, sem bloquear navegação. Uma mudança de modo deve preservar o ponto de leitura ao retirar o pin.
 8. Limpar timeline, ScrollTrigger, opacidades, listeners, observadores e RAF na desmontagem/mudança de modo. A fixação nativa é habilitada somente pelo modo de layout, sem estilos de pin a restaurar. Não deixar duas instâncias nem trilhas com altura antiga.
 
@@ -57,7 +57,7 @@ Conferência posterior em navegador nesta revisão: 320 × 800, 390 × 844, 768 
 
 ## Telas pequenas, navegação e acessibilidade
 
-O pin só será ativado quando o palco completo couber na altura útil, medido com fotos, texto, contatos e painel. Se não couber, especialmente com descrições expandidas ou em paisagem baixa, entregar a identidade final em fluxo normal. Movimento reduzido também usa texto, retrato e painel estáticos, sem percurso extra.
+No computador, o palco completo decide o pin. No celular recolhido, medir o núcleo de leitura até o cabeçalho do painel, mantendo a altura completa do conteúdo no fluxo. Isso conserva a abertura dos olhos nas alturas úteis de 658 e 664 px, sem recortar os resultados. Expandir descrições volta a medir o conjunto completo. Se o núcleo ou a composição expandida não couber, especialmente em paisagem baixa, entregar a identidade final em fluxo normal. Movimento reduzido também usa texto, retrato e painel estáticos, sem percurso extra.
 
 O link História chega ao primeiro quadro e ao título abaixo da navbar. Rolagem de volta acompanha a sequência inversa, sem reinício automático. Histórico/restauração preserva a posição quando possível. Fazer orçamento continua chegando ao campo de nome; links externos e teclado funcionam durante o pin. Tab pode sair da região, sem aprisionamento ou correção forçada do foco. Cabeçalhos visuais em troca não duplicam a leitura assistiva. Não adicionar anúncios automáticos a cada fração do scroll.
 

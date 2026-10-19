@@ -26,6 +26,7 @@
 html { scroll-behavior: smooth; scroll-padding-top: var(--anchor-offset, 100px); scrollbar-gutter: stable; }
 html:has(dialog[open]) { overflow: hidden; }
 body { margin: 0; min-width: 0; }
+.scene-viewport-measure { position: fixed; inset: 0 auto auto 0; display: block; width: 0; height: 100vh; height: 100svh; visibility: hidden; pointer-events: none; contain: strict; }
 a { color: inherit; text-decoration: none; }
 button, input, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
@@ -99,6 +100,7 @@ html:has(dialog[open]) { overflow: hidden; }
 .site-atmosphere canvas { display: block; width: 100%; height: 100%; }
 main, .site-footer { position: relative; z-index: 1; }
 .site-contents { position: relative; padding: clamp(3rem, 7vh, 5rem) var(--page-gutter) 1.5rem; overflow-x: clip; }
+@media (max-width: 767px) { .site-contents { padding-bottom: 4.5rem; } }
 .index-stage { position: relative; }
 .index-entry { position: relative; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 1.5rem; }
 .site-contents[data-entry="hold"] .index-entry { opacity: 0; visibility: hidden; pointer-events: none; }

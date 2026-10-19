@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react';
 import { Intro } from './components/Intro';
 import { Contents } from './components/Contents';
 import { type ServiceId } from './config/site';
@@ -7,28 +7,36 @@ import { SiteNavigation } from './components/SiteNavigation';
 import { Story } from './components/Story';
 import { Portfolio } from './components/Portfolio';
 import { Quote } from './components/Quote';
-import { shouldPlayOpening, type OpeningMode } from './lib/opening';
+import { type OpeningMode } from './lib/opening';
+import { type OpeningPosition, type OpeningStartup } from './lib/openingStartup';
 import { alignContentSection, alignIndex, navigateToIndex } from './lib/navigation';
 import type { IndexEntry } from './lib/indexMotion';
 import { SpaceBackdrop } from './components/SpaceBackdrop';
 import { SiteFooter } from './components/SiteFooter';
 import { createAnchorRouting } from './lib/anchorRouting';
 
-export function App() {
+export function App({ startup, initialPosition }: { startup: OpeningStartup; initialPosition: OpeningPosition | null }) {
   const [selectedServices, setSelectedServices] = useState<ServiceId[]>([]);
   const toggleSelectedService = useCallback((id: ServiceId) => setSelectedServices(current => toggleService(current, id)), []);
   const [indexEntry, setIndexEntry] = useState<IndexEntry>('idle');
-  const [openingMode, setOpeningMode] = useState<OpeningMode>(() => shouldPlayOpening(
-    window.location.hash, window.scrollY, window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  ) ? 'hidden' : 'visible');
+  const [openingMode, setOpeningMode] = useState<OpeningMode>(startup.playFormation ? 'hidden' : 'visible');
+  const [openingPending, setOpeningPending] = useState(startup.playFormation);
   const mode = useRef(openingMode);
   const releaseOpening = useCallback((animate: boolean) => {
     if (mode.current === 'visible' || (animate && mode.current !== 'hidden')) return;
     mode.current = animate ? 'fade' : 'visible';
     setOpeningMode(mode.current);
   }, []);
-  const formationComplete = useCallback(() => releaseOpening(true), [releaseOpening]);
-  const bypassOpening = useCallback(() => releaseOpening(false), [releaseOpening]);
+  const openingTimeout = useCallback(() => releaseOpening(true), [releaseOpening]);
+  const formationComplete = useCallback(() => {
+    setOpeningPending(false);
+    releaseOpening(true);
+  }, [releaseOpening]);
+  const bypassOpening = useCallback(() => {
+    initialPosition?.release();
+    setOpeningPending(false);
+    releaseOpening(false);
+  }, [releaseOpening, initialPosition]);
   const enterIndex = useCallback((focus = true) => {
     bypassOpening();
     navigateToIndex(focus);
@@ -45,8 +53,15 @@ export function App() {
     enterIndex();
   };
 
+  useLayoutEffect(() => {
+    if (!openingPending) { initialPosition?.release(); return; }
+    return initialPosition?.acquire();
+  }, [initialPosition, openingPending]);
+
   useEffect(() => {
-    const scroll = () => { if (window.scrollY > 1) bypassOpening(); };
+    // Scroll alone can be the browser restoring its saved offset before pageshow.
+    // Actual navigation gestures bypass immediately, without canceling their default action.
+    const wheel = (event: WheelEvent) => { if (!event.ctrlKey) bypassOpening(); };
     const key = (event: KeyboardEvent) => {
       if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) bypassOpening();
     };
@@ -64,22 +79,26 @@ export function App() {
     const focus = (event: FocusEvent) => {
       if (event.target instanceof Element && !event.target.closest('#inicio, .site-header, .skip-link')) bypassOpening();
     };
-    const pageshow = (event: PageTransitionEvent) => { if (event.persisted) bypassOpening(); scroll(); };
-    window.addEventListener('wheel', bypassOpening, { passive: true });
+    const pageshow = (event: PageTransitionEvent) => { if (event.persisted) bypassOpening(); };
+    const traversal = () => {
+      // An initial popstate can be emitted without a user traversal. Section changes
+      // release native restoration before hashchange; a same-entry event keeps the intro.
+      if (window.location.hash && window.location.hash !== '#inicio') bypassOpening();
+    };
+    window.addEventListener('wheel', wheel, { passive: true });
     window.addEventListener('touchmove', bypassOpening, { passive: true });
-    window.addEventListener('scroll', scroll, { passive: true });
     window.addEventListener('keydown', key);
     window.addEventListener('hashchange', bypassOpening);
+    window.addEventListener('popstate', traversal);
     window.addEventListener('pageshow', pageshow);
     document.addEventListener('click', anchor);
     document.addEventListener('focusin', focus);
-    scroll();
     return () => {
-      window.removeEventListener('wheel', bypassOpening);
+      window.removeEventListener('wheel', wheel);
       window.removeEventListener('touchmove', bypassOpening);
-      window.removeEventListener('scroll', scroll);
       window.removeEventListener('keydown', key);
       window.removeEventListener('hashchange', bypassOpening);
+      window.removeEventListener('popstate', traversal);
       window.removeEventListener('pageshow', pageshow);
       document.removeEventListener('click', anchor);
       document.removeEventListener('focusin', focus);
@@ -92,7 +111,7 @@ export function App() {
     let frame = 0;
     const destinations = ['#indice', '#historia', '#portfolio', '#orcamento'];
     const routing = createAnchorRouting(destinations);
-    const initialSection = destinations.includes(window.location.hash);
+    const initialSection = startup.alignInitialSection;
     const schedule = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
@@ -138,7 +157,7 @@ export function App() {
       window.removeEventListener('keydown', cancelInitialCorrection);
       document.removeEventListener('click', explicitLink);
     };
-  }, []);
+  }, [startup]);
 
   return (
     <>
@@ -146,9 +165,10 @@ export function App() {
       <a className="skip-link" href="#indice" onClick={skipToIndex}>Ir para o índice</a>
       <SiteNavigation openingMode={openingMode} exiting={indexEntry === 'hold'} />
       <main>
-        <Intro openingMode={openingMode} onFormationComplete={formationComplete} onBypass={bypassOpening} onEnterIndex={enterIndex} onIndexTransition={setIndexEntry} />
-        <Contents entry={indexEntry} onEntryComplete={indexRevealed} selectedServices={selectedServices} onToggleService={toggleSelectedService} />
-        <Story />
+        <Intro openingMode={openingMode} openingPending={openingPending} onOpeningTimeout={openingTimeout}
+          onFormationComplete={formationComplete} onBypass={bypassOpening} onEnterIndex={enterIndex} onIndexTransition={setIndexEntry} />
+        <Contents entry={indexEntry} onEntryComplete={indexRevealed} selectedServices={selectedServices} onToggleService={toggleSelectedService} alignInitialSection={startup.alignInitialSection} />
+        <Story alignInitialSection={startup.alignInitialSection} />
         <Portfolio />
         <Quote selectedServices={selectedServices} onToggleService={toggleSelectedService} />
       </main>

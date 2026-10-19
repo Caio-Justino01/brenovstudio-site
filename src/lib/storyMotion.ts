@@ -3,7 +3,7 @@ export type StoryScrollSettings = {
   eyes: readonly [number, number]; invitation: readonly [number, number]; identity: readonly [number, number];
   light: { appear: readonly [number, number]; fade: readonly [number, number] };
 };
-export type StoryMetrics = { width: number; height: number; header: number; stageHeight: number; reduced: boolean; failed: boolean };
+export type StoryMetrics = { width: number; height: number; header: number; stageHeight: number; pinHeight?: number; reduced: boolean; failed: boolean };
 export type StoryProgress = { scrollProgress: number; visualProgress: number };
 const clamp = (value: number) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 const ramp = (value: number, range: readonly [number, number]) => {
@@ -12,9 +12,10 @@ const ramp = (value: number, range: readonly [number, number]) => {
 };
 
 export function storyLayout(metrics: StoryMetrics, settings: StoryScrollSettings) {
-  const valid = [metrics.width, metrics.height, metrics.header, metrics.stageHeight].every(Number.isFinite) && metrics.header >= 0;
+  const pinHeight = metrics.pinHeight ?? metrics.stageHeight;
+  const valid = [metrics.width, metrics.height, metrics.header, metrics.stageHeight, pinHeight].every(Number.isFinite) && metrics.header >= 0;
   const available = valid ? Math.max(0, metrics.height - metrics.header - settings.inset * 2) : 0;
-  const pinned = valid && metrics.width > 0 && metrics.stageHeight > 0 && metrics.stageHeight <= available && !metrics.reduced && !metrics.failed;
+  const pinned = valid && metrics.width > 0 && metrics.stageHeight > 0 && pinHeight > 0 && pinHeight <= available && !metrics.reduced && !metrics.failed;
   const distance = pinned ? Math.max(settings.minDistance, Math.min(settings.maxDistance, available * settings.distanceRatio)) : 0;
   return { pinned, available, distance, top: (Number.isFinite(metrics.header) ? Math.max(0, metrics.header) : 0) + settings.inset };
 }
@@ -37,10 +38,11 @@ export function storyEyeLight(progress: number, settings: StoryScrollSettings) {
 export function stableStoryMetrics(next: StoryMetrics, previous: StoryMetrics): StoryMetrics {
   const pixel = (key: 'width' | 'height' | 'header' | 'stageHeight') =>
     Math.abs(next[key] - previous[key]) < 1 ? previous[key] : Math.round(next[key]);
-  return { width: pixel('width'), height: pixel('height'), header: pixel('header'), stageHeight: pixel('stageHeight'), reduced: next.reduced, failed: next.failed };
+  const pinHeight = next.pinHeight === undefined ? undefined : Math.abs(next.pinHeight - (previous.pinHeight ?? 0)) < 1 ? previous.pinHeight : Math.round(next.pinHeight);
+  return { width: pixel('width'), height: pixel('height'), header: pixel('header'), stageHeight: pixel('stageHeight'), pinHeight, reduced: next.reduced, failed: next.failed };
 }
 export function sameStoryMetrics(a: StoryMetrics, b: StoryMetrics) {
-  return a.width === b.width && a.height === b.height && a.header === b.header && a.stageHeight === b.stageHeight && a.reduced === b.reduced && a.failed === b.failed;
+  return a.width === b.width && a.height === b.height && a.header === b.header && a.stageHeight === b.stageHeight && a.pinHeight === b.pinHeight && a.reduced === b.reduced && a.failed === b.failed;
 }
 export function captureStoryProgress(start: number, end: number, top: number, visual: number): StoryProgress | null {
   if (![start, end, top, visual].every(Number.isFinite) || end <= start || top < start || top > end) return null;

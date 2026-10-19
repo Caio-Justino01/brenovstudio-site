@@ -9,14 +9,14 @@ import './Story.css';
 
 type ImageState = 'loading' | 'ready' | 'failed';
 
-export function Story() {
+export function Story({ alignInitialSection }: { alignInitialSection: boolean }) {
   const root = useRef<HTMLElement>(null), track = useRef<HTMLDivElement>(null), stage = useRef<HTMLDivElement>(null);
   const [openImage, setOpenImage] = useState<ImageState>('loading');
   const [closedImage, setClosedImage] = useState<ImageState>('loading');
   const imagesSettled = openImage !== 'loading' && closedImage !== 'loading';
   const staticPortrait = openImage === 'failed' || closedImage === 'failed';
   const imageReady = imagesSettled && (openImage === 'ready' || closedImage === 'ready');
-  const { layout, metrics } = useStoryScroll(root, track, stage, staticPortrait);
+  const { layout, metrics } = useStoryScroll(root, track, stage, staticPortrait, alignInitialSection);
 
   useEffect(() => {
     const open = root.current?.querySelector<HTMLImageElement>('.artist-eyes-open');
@@ -32,8 +32,9 @@ export function Story() {
   }, []);
 
   return <section ref={root} id="historia" className="artist-story" aria-labelledby="story-title" tabIndex={-1}
-    data-layout={layout.pinned ? 'pinned' : 'flow'} data-reduced={metrics.reduced || undefined}
+    data-layout={!metrics.stageHeight ? 'pending' : layout.pinned ? 'pinned' : 'flow'} data-reduced={metrics.reduced || undefined}
     style={{ '--story-top': `${layout.top}px`, '--story-travel': `${layout.distance}px` } as CSSProperties}>
+    <span className="scene-viewport-measure" aria-hidden="true" />
     <div className="artist-track" ref={track}>
       <div className="artist-stage" ref={stage}>
         <h2 id="story-title" className="section-caption artist-caption"><GlareText text="História" /></h2>
